@@ -133,13 +133,13 @@ class Signal(Logger):
             subsamples[i] = signal[self.offset:self.offset+self.length]
             self._means[i] = subsamples[i].mean()
             self._stds[i] = subsamples[i].std()
-            self.info("subsignal %d: %s (%g,%g)"
+            self.debug("subsignal %d: %s (%g,%g)"
                       %(i,subsamples[i],self._means[i],self._stds[i]))
-        self.info("means %s (stds %s)"
+        self.debug("means %s (stds %s)"
                    %(self.subsignalMeans,self.subsignalStds))
         self._composedMean = self._means.mean()
         self._composedStd = self._means.std()
-        self.info("composed mean %g (std %g)"
+        self.debug("composed mean %g (std %g)"
                    %(self._composedMean,self._composedStd))
 
     @property

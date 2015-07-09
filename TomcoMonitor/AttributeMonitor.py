@@ -58,7 +58,7 @@ class AttributeMonitor(Logger):
         self.buildProxy()
         self._attrName = attrName
         self._eventID = None
-        self.info("build Monitor")
+        self.debug("build Monitor")
         self._signal = Signal(self._name)
         self._signalCT = self._signal.nsubsignals
         self.subscribe()
