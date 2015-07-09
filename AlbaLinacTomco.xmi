@@ -37,12 +37,6 @@
     <states name="ON" description="">
       <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
     </states>
-    <states name="RUNNING" description="">
-      <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
-    </states>
-    <states name="ALARM" description="">
-      <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
-    </states>
     <states name="FAULT" description="">
       <status abstract="false" inherited="false" concrete="true" concreteHere="true"/>
     </states>

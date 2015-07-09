@@ -49,7 +49,8 @@ class AttributeMonitor(Logger):
     """
     #TODO: collect in a cyclic buffer the signal mean outputs to allow the 
     #      user to have more than the part 3 subsignal mean
-    def __init__(self,devName,attrName,logLevel=Logger.Info):
+    def __init__(self,devName,attrName,groupName=None,callback=None,
+                 logLevel=Logger.Info):
         self._name = "%s/%s"%(devName,attrName)
         Logger.__init__(self,self._name)
         self.setLogLevel(logLevel)
@@ -61,7 +62,24 @@ class AttributeMonitor(Logger):
         self.debug("build Monitor")
         self._signal = Signal(self._name)
         self._signalCT = self._signal.nsubsignals
+        self.groupName = groupName
+        self._callback = callback
         self.subscribe()
+
+    def __del__(self):
+        self.unsubscribe()
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def devName(self):
+        return self._devName
+
+    @property
+    def attrName(self):
+        return self._attrName
 
     def buildProxy(self):
         try:
@@ -100,16 +118,26 @@ class AttributeMonitor(Logger):
                                %(self._name,event.attr_name,
                                  event.attr_value.value))
                     self._signal.array = event.attr_value.value
-                    self.info("Subsignal means %s, composed mean %s"
-                              %(self._signal.subsignalMeans,
-                                self._signal.composedMean))
+                    self.debug("Subsignal means %s, composed mean %s"
+                               %(self._signal.subsignalMeans,
+                                 self._signal.composedMean))
                     #TODO: push to the cyclic buffer
+                    self._callback(self)
                 else:
                     self.warn("%s::PushEvent() %s: value has None type"
                                %(self._name,event.attr_name))
         except Exception,e:
             self.error("%s::PushEvent() exception %s:"%(self._name,e))
 
+    @property
+    def subsignals(self):
+        return self._signal.subsignalMeans
+    
+    @property
+    def composed(self):
+        return self._signal.composedMean
+
+#---- #Testing area
 
 def getOptions():
     from optparse import OptionParser

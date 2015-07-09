@@ -51,8 +51,10 @@ import sys
 # Add additional import
 #----- PROTECTED REGION ID(AlbaLinacTomco.additionnal_import) ENABLED START -----#
 import functools
+import time
 from TomcoMonitor import AttributeMonitor
 from taurus import Logger
+import traceback
 
 def AttrExc(function):
     '''Decorates commands so that the exception is logged and also raised.
@@ -69,13 +71,15 @@ def AttrExc(function):
     functools.update_wrapper(nestedMethod,function)
     return nestedMethod
 
+def latin1(x):
+  return x.decode('utf-8').replace(u'\u2070', u'\u00b0').\
+      replace(u'\u03bc',u'\u00b5').encode('latin1')
+
 #----- PROTECTED REGION END -----#	//	AlbaLinacTomco.additionnal_import
 
 ## Device States Description
 ## INIT : 
 ## ON : 
-## RUNNING : 
-## ALARM : 
 ## FAULT : 
 
 class AlbaLinacTomco (PyTango.Device_4Impl):
@@ -132,7 +136,7 @@ class AlbaLinacTomco (PyTango.Device_4Impl):
 
     #---- #dynattr segment
     def _addDynAttribute(self,attrName,attrType,dim=None,expert=False,
-                         memorized=None,label=None,description=None,units=True,
+                         memorized=None,label=None,description=None,units=None,
                          format=None,events=True,**kwargs):
         attr,readmethod,writemethod = self.__buildAttr(attrName,attrType,dim,
                                                        **kwargs)
@@ -167,64 +171,65 @@ class AlbaLinacTomco (PyTango.Device_4Impl):
                 aprop.set_label(latin1(label))
             if description:
                 aprop.set_description(latin1(description))
-            if units and type(self.Units) == str:
-                aprop.set_unit(latin1(self.Units))
+            if units:
+                aprop.set_unit(latin1(units))
             if format:
                 aprop.set_format(format)
             attr.set_default_properties(aprop)
 
     def __setupEvents(self,attrName):
         self.set_change_event(attrName,True,False)
-#        if attrType == PyTango.DevDouble:
-#            self.eventAttrCallback(attrName,float('NaN'))
-#        #subscribe it to have periodic readings and event emission.
-#        self._readers[attrName].subscribe(attrName,
-#                                          self.eventAttrCallback)
         
     def _addDyn0DAttribute(self,attrName,attrType,rw=False,expert=False,
                            **kwargs):
         if rw:
             attr = PyTango.Attr(attrName,attrType, PyTango.READ_WRITE)
-            w_meth = AttrExc(getattr(self,'write_0D_%s_attr'
-                                         %('expert' if expert else '')))
+            w_meth = AttrExc(getattr(self,'write_0D%s_attr'
+                                         %('_expert' if expert else '')))
         else:
             attr = PyTango.Attr(attrName,attrType, PyTango.READ)
             w_meth = None
-        r_meth = AttrExc(getattr(self,'read_0D_%s_attr'
-                                 %('expert' if expert else '')))
+        r_meth = AttrExc(getattr(self,'read_0D%s_attr'
+                                 %('_expert' if expert else '')))
         return attr,r_meth,w_meth
         
-    def _addDyn1DAttribute(self,attrName,attrType,dim,**kwargs):
+    def _addDyn1DAttribute(self,attrName,attrType,dim,rw=False,expert=False,
+                           **kwargs):
         if rw:
             attr = PyTango.SpectrumAttr(attrName,attrType,PyTango.READ_WRITE,
-                                        dim_x=dim[0])
-            w_meth = AttrExc(getattr(self,'write_1D_%s_attr'
-                                         %('expert' if expert else '')))
+                                        dim[0])
+            w_meth = AttrExc(getattr(self,'write_1D%s_attr'
+                                         %('_expert' if expert else '')))
         else:
-            attr = PyTango.SpectrumAttr(attrName,attrType,PyTango.READ,
-                                        dim_x=dim[0])
+            attr = PyTango.SpectrumAttr(attrName,attrType,PyTango.READ,dim[0])
             w_meth = None
-        r_meth = AttrExc(getattr(self,'read_1D_%s_attr'
-                                 %('expert' if expert else '')))
+        r_meth = AttrExc(getattr(self,'read_1D%s_attr'
+                                 %('_expert' if expert else '')))
         return attr,r_meth,w_meth
         
-    def _addDyn2DAttribute(self,attrName,attrType,dim,**kwargs):
+    def _addDyn2DAttribute(self,attrName,attrType,dim,rw=False,expert=False,
+                           **kwargs):
         if rw:
             attr = PyTango.ImageAttr(attrName,attrType,PyTango.READ_WRITE,
-                                     dim_x=dim[0],dim_y=dim[1])
-            w_meth = AttrExc(getattr(self,'write_2D_%s_attr'
-                                         %('expert' if expert else '')))
+                                     dim[0],dim[1])
+            w_meth = AttrExc(getattr(self,'write_2D%s_attr'
+                                         %('_expert' if expert else '')))
         else:
             attr = PyTango.ImageAttr(attrName,attrType,PyTango.READ,
-                                     dim_x=dim[0],dim_y=dim[1])
+                                     dim[0],dim[1])
             w_meth = None
-        r_meth = AttrExc(getattr(self,'read_2D_%s_attr'
-                                 %('expert' if expert else '')))
+        r_meth = AttrExc(getattr(self,'read_2D%s_attr'
+                                 %('_expert' if expert else '')))
         return attr,r_meth,w_meth
     
     @AttrExc
     def read_0D_attr(self,attr):
-        pass
+        attrName = attr.get_name()
+        k = attrName.split("_Mean")[0]
+        if k in self._monitor.keys():
+            attr.set_value(self._monitor[k].composed)
+        else:
+            raise AttributeError("Not found %s as attribute"%(attrName))
 
     @AttrExc
     def write_0D_attr(self,attr):
@@ -240,7 +245,13 @@ class AlbaLinacTomco (PyTango.Device_4Impl):
 
     @AttrExc
     def read_1D_attr(self,attr):
-        pass
+        attrName = attr.get_name()
+        k = attrName
+        if k in self._monitor.keys():
+            value = self._monitor[k].subsignals
+            attr.set_value(value,len(value))
+        else:
+            raise AttributeError("Not found %s as attribute"%(attrName))
 
     @AttrExc
     def write_1D_attr(self,attr):
@@ -270,7 +281,28 @@ class AlbaLinacTomco (PyTango.Device_4Impl):
     def write_2D_expert_attr(self,attr):
         pass
 
+    def monitorCallback(self,caller):
+        self.debug_stream("received from %s: %s , %s"
+                          %(caller.name,caller.subsignals,caller.composed))
+        if caller.groupName in self._monitor.keys():
+            self._monitor[caller.groupName]
+            self.fireEvent(caller.groupName,caller.subsignals)
+            self.fireEvent("%s_Mean"%caller.groupName,caller.composed)
+
     #---- done dynattr segment
+    
+    #---- #events segment
+    
+    def fireEvent(self,attrName,value,timestamp=None,
+                  quality=PyTango.AttrQuality.ATTR_VALID):
+        '''Like overload the push_change_event to have logging of it.
+        '''
+        if not timestamp:
+            timestamp = time.time()
+        self.debug_stream("fireEvent for %s: %s (%s)"%(attrName,value,quality))
+        self.push_change_event(attrName,value,timestamp,quality)
+    
+    #---- done events segment
     
     #----- PROTECTED REGION END -----#	//	AlbaLinacTomco.global_variables
 
@@ -285,7 +317,7 @@ class AlbaLinacTomco (PyTango.Device_4Impl):
     def delete_device(self):
         self.debug_stream("In delete_device()")
         #----- PROTECTED REGION ID(AlbaLinacTomco.delete_device) ENABLED START -----#
-        
+        del self._FW_500MHz
         #----- PROTECTED REGION END -----#	//	AlbaLinacTomco.delete_device
 
     def init_device(self):
@@ -297,20 +329,29 @@ class AlbaLinacTomco (PyTango.Device_4Impl):
         self.set_change_event('Status',True,False)
         self.change_state(PyTango.DevState.INIT)
         try:
+            self._monitor = {}
             if not self.deviceSource:
                 raise Exception("deviceSource property not defined")
             if not self.FW_500MHz_Source:
                 raise Exception("FW_500MHz_Source property not defined")
-            self._FW_500MHz = AttributeMonitor(self.deviceSource,
-                                             self.FW_500MHz_Source,
-                                             logLevel=Logger.debug)
-            self
+            groupName = 'FW_500MHz'
+            self._monitor[groupName] = AttributeMonitor(self.deviceSource,
+                                       self.FW_500MHz_Source,
+                                       groupName=groupName,
+                                       callback=self.monitorCallback,
+                                       logLevel=Logger.info)
+            attrName = groupName
+            self._addDynAttribute(attrName,PyTango.DevDouble,dim=[3])
+            attrName = "%s_Mean"%(groupName)
+            self._addDynAttribute(attrName,PyTango.DevDouble)
             self.change_state(PyTango.DevState.ON)
             self.addStatusMsg("")
         except Exception,e:
             msg = "Cannot create the monitor: %s"%(e)
             self.change_state(PyTango.DevState.FAULT)
             self.addStatusMsg(msg,important=True)
+            self.error_stream(msg)
+            traceback.print_exc()
             
         #----- PROTECTED REGION END -----#	//	AlbaLinacTomco.init_device
 
