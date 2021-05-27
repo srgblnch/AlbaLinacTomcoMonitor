@@ -124,7 +124,7 @@ class AttributeMonitor(Logger):
                     #TODO: push to the cyclic buffer
                     self._callback(self)
                 else:
-                    self.warn("%s::PushEvent() %s: value has None type"
+                    self.warning("%s::PushEvent() %s: value has None type"
                                %(self._name,event.attr_name))
         except Exception,e:
             self.error("%s::PushEvent() exception %s:"%(self._name,e))

@@ -332,18 +332,27 @@ class AlbaLinacTomco (PyTango.Device_4Impl):
             self._monitor = {}
             if not self.deviceSource:
                 raise Exception("deviceSource property not defined")
-            if not self.FW_500MHz_Source:
-                raise Exception("FW_500MHz_Source property not defined")
-            groupName = 'FW_500MHz'
-            self._monitor[groupName] = AttributeMonitor(self.deviceSource,
-                                       self.FW_500MHz_Source,
-                                       groupName=groupName,
-                                       callback=self.monitorCallback,
-                                       logLevel=Logger.info)
-            attrName = groupName
-            self._addDynAttribute(attrName,PyTango.DevDouble,dim=[3])
-            attrName = "%s_Mean"%(groupName)
-            self._addDynAttribute(attrName,PyTango.DevDouble)
+            if not self.SourceAttributes:
+                raise Exception("SourceAttributes property not well defined: "\
+                                "%r (%s)"%(self.SourceAttributes,
+                                           type(self.SourceAttributes)))
+            
+            for i,attrName in enumerate(self.SourceAttributes):
+                print self.SourceMeanings
+                if len(self.SourceMeanings) > i:
+                    print len(self.SourceMeanings),i
+                    groupName = self.SourceMeanings[i]
+                else:
+                    groupName = attrName#'FW_500MHz'
+                self._monitor[groupName] = AttributeMonitor(self.deviceSource,
+                                                attrName,
+                                                groupName=groupName,
+                                                callback=self.monitorCallback,
+                                                logLevel=Logger.info)
+                attrName = groupName
+                self._addDynAttribute(attrName,PyTango.DevDouble,dim=[3])
+                attrName = "%s_Mean"%(groupName)
+                self._addDynAttribute(attrName,PyTango.DevDouble)
             self.change_state(PyTango.DevState.ON)
             self.addStatusMsg("")
         except Exception,e:
@@ -424,9 +433,13 @@ class AlbaLinacTomcoClass(PyTango.DeviceClass):
             [PyTango.DevString,
             "device from where data will come from",
             [] ],
-        'FW_500MHz_Source':
-            [PyTango.DevString,
+        'SourceAttributes':
+            [PyTango.DevVarStringArray,
             "attribute of the device from where the data will come from",
+            [] ],
+        'SourceMeanings':
+            [PyTango.DevVarStringArray,
+            "prefix for the dynattr where the calculations will be",
             [] ],
         }
 
